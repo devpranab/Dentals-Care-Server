@@ -31,10 +31,11 @@ const client = new MongoClient(uri, {
     }
 });
 
+// Verify jwt
 function verifyJWT(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-        return res.status(401).send({ message: 'Unautorized Access' })
+        return res.status(401).send({ message: 'Unauthorized Access' });
     }
     const token = authHeader.split(' ')[1];
     jwt.verify(token, process.env.ACCESS_TOKEN, function (error, decoded) {
@@ -52,24 +53,6 @@ async function run() {
         // Send a ping to confirm a successful connection
         const bookingsCollection = client.db('dentalsCare').collection('bookings');
         const usersCollection = client.db('dentalsCare').collection('users');
-        app.get('/bookings', async (req, res) => {
-            const booking = {}
-            const bookings = await bookingsCollection.find(booking).toArray()
-            res.send(bookings)
-        })
-
-        app.get('/booking', verifyJWT, async (req, res) => {
-            const email = req.query.email;
-            const decodedEmail = req.decoded.email;
-
-            if (email !== decodedEmail) {
-                return res.status(403).send({ message: 'Forbidden Access.' })
-            }
-
-            const query = { email: email }
-            const bookings = await bookingsCollection.find(query).toArray()
-            res.send(bookings)
-        })
 
         // CRUD start
         //Post bookings
@@ -91,15 +74,31 @@ async function run() {
             }
             const result = await bookingsCollection.insertOne(booking);
             res.send(result);
+
         });
 
+        // Get bookings
+        app.get('/booking', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+
+            if (email !== decodedEmail) {
+                return res.status(403).send({ message: 'Forbidden Access.' })
+            }
+
+            const query = { email: email }
+            const bookings = await bookingsCollection.find(query).toArray()
+            res.send(bookings);
+        });
+
+        // Get jwt
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
             const query = { email: email }
             const user = await usersCollection.findOne(query);
             if (user) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
-                res.send({ accessToken: token })
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN)
+                return res.send({ accessToken: token })
             }
 
             res.status(403).send({ accessToken: '' })
@@ -131,4 +130,4 @@ app.listen(port, () => {
 
 //npm start
 //npm run start-dev
-//localhost:5076
+//localhost:5012
